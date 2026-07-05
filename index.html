@@ -1,0 +1,1686 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Work Timer Tracker</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB" crossorigin="anonymous">
+  <style>
+    :root {
+      --app-bg: #f6f7f9;
+      --app-text: #18212f;
+      --app-muted: #5d6878;
+      --app-line: #d9e0e8;
+      --app-accent: #0f766e;
+      --app-accent-strong: #0b5f59;
+      --app-accent-soft: #d9f1ee;
+    }
+
+    body {
+      min-height: 100vh;
+      background:
+        linear-gradient(180deg, rgba(217, 241, 238, 0.7), rgba(246, 247, 249, 0) 360px),
+        var(--app-bg);
+      color: var(--app-text);
+    }
+
+    .status-pill {
+      gap: 8px;
+      background: rgba(255, 255, 255, 0.82);
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 999px;
+      background: var(--app-accent);
+      box-shadow: 0 0 0 4px rgba(15, 118, 110, 0.12);
+    }
+
+    .error-list ul {
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .summary-value {
+      font-size: clamp(1.45rem, 2.4vw, 2rem);
+    }
+
+    .timer-value {
+      font-size: clamp(2rem, 8vw, 3.4rem);
+      font-variant-numeric: tabular-nums;
+    }
+
+    .timer-metric {
+      background: #f8f9fa;
+      border: 1px solid var(--bs-border-color);
+      border-radius: var(--bs-border-radius);
+      min-height: 72px;
+    }
+
+    .calendar-toolbar {
+      display: grid;
+      grid-template-columns: 42px minmax(0, 1fr) 42px;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .calendar-heading {
+      text-align: center;
+      font-size: 1.2rem;
+      font-weight: 800;
+    }
+
+    .calendar-grid {
+      display: grid;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 1px;
+      background: var(--app-line);
+      border: 1px solid var(--app-line);
+      border-radius: var(--bs-border-radius);
+      overflow: hidden;
+    }
+
+    .weekday,
+    .day-cell {
+      background: #fff;
+    }
+
+    .weekday {
+      min-height: 38px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--app-muted);
+      font-weight: 800;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+    }
+
+    .day-cell {
+      position: relative;
+      min-height: 104px;
+      padding: 9px;
+      text-align: left;
+      color: var(--app-text);
+      border-radius: 0;
+      border: 0;
+      display: grid;
+      align-content: start;
+      gap: 8px;
+    }
+
+    .day-cell:hover {
+      background: #f7fbfb;
+    }
+
+    .day-cell.is-outside {
+      color: #9aa4b2;
+      background: #fafbfc;
+    }
+
+    .day-cell.has-entry {
+      background: var(--app-accent-soft);
+    }
+
+    .day-cell.is-selected {
+      box-shadow: inset 0 0 0 3px var(--app-accent);
+      z-index: 1;
+    }
+
+    .day-cell.is-today .day-number {
+      background: var(--app-text);
+      color: #fff;
+    }
+
+    .day-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.92rem;
+    }
+
+    .day-duration {
+      display: inline-flex;
+      width: fit-content;
+      max-width: 100%;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.82);
+      border: 1px solid rgba(15, 118, 110, 0.22);
+      color: var(--app-accent-strong);
+      padding: 4px 8px;
+      font-size: 0.86rem;
+      font-weight: 800;
+      white-space: nowrap;
+    }
+
+    .file-system-actions {
+      display: none;
+    }
+
+    .file-system-actions.is-visible {
+      display: flex;
+    }
+
+    .import-file-wrap {
+      min-width: min(100%, 260px);
+    }
+
+    @media (max-width: 620px) {
+      .day-cell {
+        min-height: 78px;
+        padding: 6px;
+      }
+
+      .weekday {
+        min-height: 32px;
+        font-size: 0.72rem;
+      }
+
+      .day-number {
+        width: 24px;
+        height: 24px;
+        font-size: 0.82rem;
+      }
+
+      .day-duration {
+        border-radius: var(--bs-border-radius);
+        padding: 3px 5px;
+        font-size: 0.74rem;
+        white-space: normal;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container-xxl py-4 py-lg-5">
+    <header class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
+      <div>
+        <h1 class="display-5 fw-bold lh-1 mb-2">Work Timer Tracker</h1>
+        <p class="lead text-secondary mb-0">Track workdays, review your month, and keep backups as simple JSON files.</p>
+      </div>
+      <div class="status-pill border rounded-pill px-3 py-2 text-secondary d-inline-flex align-items-center shadow-sm" aria-live="polite">
+        <span class="status-dot" aria-hidden="true"></span>
+        <span id="saveStatus">Saved locally</span>
+      </div>
+    </header>
+
+    <main class="row g-4 align-items-start">
+      <section class="col-lg-4 d-grid gap-4" aria-label="Entry editor and backup tools">
+        <section class="card shadow-sm border-success-subtle" aria-labelledby="liveTrackerTitle">
+          <div class="card-body vstack gap-3">
+            <div class="d-flex align-items-center justify-content-between gap-3">
+              <h2 class="h5 mb-0" id="liveTrackerTitle">Live tracker</h2>
+              <span class="badge rounded-pill text-bg-secondary" id="timerStatusBadge">Ready</span>
+            </div>
+
+            <div class="rounded border bg-light p-3">
+              <span class="small text-secondary fw-semibold">Worked live</span>
+              <strong class="timer-value d-block lh-1 mt-2" id="timerWorkedDisplay">0:00:00</strong>
+            </div>
+
+            <div class="row g-2">
+              <div class="col-6">
+                <div class="timer-metric p-2">
+                  <span class="small text-secondary d-block">Date</span>
+                  <strong class="d-block mt-1" id="timerDateDisplay">Today</strong>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="timer-metric p-2">
+                  <span class="small text-secondary d-block">Started</span>
+                  <strong class="d-block mt-1" id="timerStartDisplay">--:--</strong>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="timer-metric p-2">
+                  <span class="small text-secondary d-block">Pause</span>
+                  <strong class="d-block mt-1" id="timerPauseDisplay">0:00:00</strong>
+                </div>
+              </div>
+              <div class="col-6">
+                <div class="timer-metric p-2">
+                  <span class="small text-secondary d-block">Total</span>
+                  <strong class="d-block mt-1" id="timerElapsedDisplay">0:00:00</strong>
+                </div>
+              </div>
+            </div>
+
+            <div class="d-flex flex-wrap gap-2">
+              <button class="btn btn-success fw-semibold" type="button" id="startTimerButton">Start work</button>
+              <button class="btn btn-outline-warning fw-semibold" type="button" id="pauseTimerButton" disabled>Pause</button>
+              <button class="btn btn-danger fw-semibold" type="button" id="stopTimerButton" disabled>Stop work</button>
+              <button class="btn btn-link text-secondary fw-semibold px-2" type="button" id="discardTimerButton" disabled>Discard</button>
+            </div>
+
+            <div class="alert d-none mb-0" id="timerMessage" role="status" aria-live="polite"></div>
+          </div>
+        </section>
+
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex align-items-center justify-content-between gap-3 mb-3">
+              <h2 class="h5 mb-0">Workday</h2>
+              <span class="small text-secondary text-end" id="selectedDateLabel"></span>
+            </div>
+
+            <form class="vstack gap-3" id="entryForm" novalidate>
+              <div>
+                <label class="form-label fw-semibold" for="entryDate">Date</label>
+                <input class="form-control" id="entryDate" name="entryDate" type="date" required>
+              </div>
+
+              <div>
+                <label class="form-label fw-semibold" for="startTime">Start time</label>
+                <input class="form-control" id="startTime" name="startTime" type="time" required>
+              </div>
+
+              <div>
+                <label class="form-label fw-semibold" for="endTime">End time</label>
+                <input class="form-control" id="endTime" name="endTime" type="time" required>
+              </div>
+
+              <div>
+                <label class="form-label fw-semibold" for="pauseMinutes">Pause duration in minutes</label>
+                <input class="form-control" id="pauseMinutes" name="pauseMinutes" type="number" min="0" step="1" inputmode="numeric" required>
+                <div class="form-text">Example: enter 45 for a 45 minute lunch break.</div>
+              </div>
+
+              <div class="alert alert-danger py-2 mb-0 d-none error-list" id="formErrors" role="alert"></div>
+
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-primary fw-semibold" type="submit">Save entry</button>
+                <button class="btn btn-outline-danger fw-semibold" type="button" id="deleteButton" disabled>Delete entry</button>
+              </div>
+            </form>
+          </div>
+        </div>
+
+        <section class="card shadow-sm" aria-labelledby="backupTitle">
+          <div class="card-body">
+            <h2 class="h5 mb-3" id="backupTitle">Backup</h2>
+
+            <div class="vstack gap-3">
+              <div class="d-flex flex-wrap gap-2 align-items-center">
+                <button class="btn btn-outline-secondary fw-semibold" type="button" id="exportJsonButton">Export JSON</button>
+                <button class="btn btn-outline-secondary fw-semibold" type="button" id="exportCsvButton">Export CSV</button>
+                <div class="flex-grow-1 import-file-wrap">
+                  <label class="visually-hidden" for="importFile">Import JSON file</label>
+                  <input class="form-control" id="importFile" type="file" accept="application/json,.json">
+                </div>
+              </div>
+
+              <div class="border rounded bg-light p-3 d-flex flex-wrap gap-3" aria-label="Import mode">
+                <div class="form-check mb-0">
+                  <input class="form-check-input" id="importModeMerge" type="radio" name="importMode" value="merge" checked>
+                  <label class="form-check-label fw-semibold" for="importModeMerge">Merge import</label>
+                </div>
+                <div class="form-check mb-0">
+                  <input class="form-check-input" id="importModeReplace" type="radio" name="importMode" value="replace">
+                  <label class="form-check-label fw-semibold" for="importModeReplace">Replace all</label>
+                </div>
+              </div>
+
+              <div class="file-system-actions flex-wrap gap-2" id="fileSystemActions" aria-label="Optional local file actions">
+                <button class="btn btn-outline-secondary fw-semibold" type="button" id="openFileButton">Open backup file</button>
+                <button class="btn btn-outline-secondary fw-semibold" type="button" id="saveFileButton">Save to chosen file</button>
+              </div>
+
+              <div class="alert d-none mb-0" id="backupMessage" role="status" aria-live="polite"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card shadow-sm" aria-labelledby="helpTitle">
+          <div class="card-body">
+            <h2 class="h5 mb-3" id="helpTitle">Help</h2>
+            <p class="text-secondary mb-2">This app stores your entries locally in this browser.</p>
+            <ul class="text-secondary mb-0 ps-3">
+              <li class="mb-2">Use <strong>Export JSON</strong> to download a backup file you can keep in a local folder.</li>
+              <li class="mb-2">Use <strong>Export CSV</strong> when you want to open the saved entries in Excel, Numbers, LibreOffice, or Google Sheets.</li>
+              <li class="mb-2">Use the file picker to import a previous backup. You can merge it with current entries or replace everything.</li>
+              <li class="mb-2">A running live timer is stored locally, but export includes saved workday entries. Stop work before exporting today.</li>
+              <li class="mb-2">Clearing browser data, using private browsing, or switching browsers may remove local entries unless you exported a backup.</li>
+              <li>Some browsers also show optional buttons for opening or saving a chosen backup file directly.</li>
+            </ul>
+          </div>
+        </section>
+      </section>
+
+      <section class="col-lg-8 d-grid gap-4" aria-label="Summaries and calendar">
+        <section class="row g-3" aria-label="Worked time totals">
+          <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+              <div class="card-body">
+                <span class="small text-secondary fw-semibold">Selected day</span>
+                <strong class="summary-value d-block lh-1 mt-2" id="daySummary">0m</strong>
+                <small class="text-secondary d-block mt-2" id="daySummaryLabel"></small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+              <div class="card-body">
+                <span class="small text-secondary fw-semibold">ISO work week</span>
+                <strong class="summary-value d-block lh-1 mt-2" id="weekSummary">0m</strong>
+                <small class="text-secondary d-block mt-2" id="weekSummaryLabel"></small>
+              </div>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="card shadow-sm h-100">
+              <div class="card-body">
+                <span class="small text-secondary fw-semibold">Calendar month</span>
+                <strong class="summary-value d-block lh-1 mt-2" id="monthSummary">0m</strong>
+                <small class="text-secondary d-block mt-2" id="monthSummaryLabel"></small>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="card shadow-sm" aria-labelledby="calendarTitle">
+          <div class="card-body">
+            <div class="calendar-toolbar mb-3">
+              <button class="btn btn-outline-secondary" type="button" id="prevMonthButton" aria-label="Previous month">&lt;</button>
+              <div class="calendar-heading" id="calendarTitle"></div>
+              <button class="btn btn-outline-secondary" type="button" id="nextMonthButton" aria-label="Next month">&gt;</button>
+            </div>
+            <div class="calendar-grid" id="calendarGrid" aria-label="Month calendar"></div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    (function () {
+      "use strict";
+
+      var STORAGE_KEY = "workTimerTracker.v1";
+      var TIMER_STORAGE_KEY = "workTimerTracker.timer.v1";
+      var BACKUP_VERSION = 1;
+      var MS_PER_SECOND = 1000;
+      var MS_PER_MINUTE = 60 * MS_PER_SECOND;
+      var DAY_NAMES = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+      var MONTH_FORMATTER = new Intl.DateTimeFormat(undefined, {
+        month: "long",
+        year: "numeric"
+      });
+      var FULL_DATE_FORMATTER = new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        year: "numeric",
+        month: "short",
+        day: "numeric"
+      });
+      var initialDate = getTodayString();
+      var initialDateParts = parseDateString(initialDate);
+
+      var state = {
+        entries: {},
+        selectedDate: initialDate,
+        visibleYear: initialDateParts.year,
+        visibleMonth: initialDateParts.month,
+        fileHandle: null,
+        backupMessageTimer: null,
+        timer: createEmptyTimer(),
+        timerIntervalId: null,
+        timerMessageTimer: null
+      };
+
+      var elements = {
+        saveStatus: document.getElementById("saveStatus"),
+        timerStatusBadge: document.getElementById("timerStatusBadge"),
+        timerWorkedDisplay: document.getElementById("timerWorkedDisplay"),
+        timerDateDisplay: document.getElementById("timerDateDisplay"),
+        timerStartDisplay: document.getElementById("timerStartDisplay"),
+        timerPauseDisplay: document.getElementById("timerPauseDisplay"),
+        timerElapsedDisplay: document.getElementById("timerElapsedDisplay"),
+        startTimerButton: document.getElementById("startTimerButton"),
+        pauseTimerButton: document.getElementById("pauseTimerButton"),
+        stopTimerButton: document.getElementById("stopTimerButton"),
+        discardTimerButton: document.getElementById("discardTimerButton"),
+        timerMessage: document.getElementById("timerMessage"),
+        entryForm: document.getElementById("entryForm"),
+        entryDate: document.getElementById("entryDate"),
+        startTime: document.getElementById("startTime"),
+        endTime: document.getElementById("endTime"),
+        pauseMinutes: document.getElementById("pauseMinutes"),
+        formErrors: document.getElementById("formErrors"),
+        deleteButton: document.getElementById("deleteButton"),
+        selectedDateLabel: document.getElementById("selectedDateLabel"),
+        daySummary: document.getElementById("daySummary"),
+        daySummaryLabel: document.getElementById("daySummaryLabel"),
+        weekSummary: document.getElementById("weekSummary"),
+        weekSummaryLabel: document.getElementById("weekSummaryLabel"),
+        monthSummary: document.getElementById("monthSummary"),
+        monthSummaryLabel: document.getElementById("monthSummaryLabel"),
+        calendarTitle: document.getElementById("calendarTitle"),
+        calendarGrid: document.getElementById("calendarGrid"),
+        prevMonthButton: document.getElementById("prevMonthButton"),
+        nextMonthButton: document.getElementById("nextMonthButton"),
+        exportJsonButton: document.getElementById("exportJsonButton"),
+        exportCsvButton: document.getElementById("exportCsvButton"),
+        importFile: document.getElementById("importFile"),
+        backupMessage: document.getElementById("backupMessage"),
+        fileSystemActions: document.getElementById("fileSystemActions"),
+        openFileButton: document.getElementById("openFileButton"),
+        saveFileButton: document.getElementById("saveFileButton")
+      };
+
+      initialize();
+
+      function initialize() {
+        state.entries = loadEntries();
+        state.timer = loadTimer();
+        if (isTimerActive()) {
+          setSelectedDate(state.timer.date);
+        }
+        loadDateIntoForm(state.selectedDate);
+        attachEvents();
+        setupOptionalFileSystemAccess();
+        ensureTimerClock();
+        renderAll();
+      }
+
+      function attachEvents() {
+        elements.entryForm.addEventListener("submit", function (event) {
+          event.preventDefault();
+          saveEntryFromForm();
+        });
+
+        elements.deleteButton.addEventListener("click", function () {
+          deleteSelectedEntry();
+        });
+
+        elements.startTimerButton.addEventListener("click", function () {
+          startTimer();
+        });
+
+        elements.pauseTimerButton.addEventListener("click", function () {
+          toggleTimerPause();
+        });
+
+        elements.stopTimerButton.addEventListener("click", function () {
+          stopTimer();
+        });
+
+        elements.discardTimerButton.addEventListener("click", function () {
+          discardTimer();
+        });
+
+        elements.entryDate.addEventListener("change", function () {
+          if (!isDateString(elements.entryDate.value)) {
+            return;
+          }
+          selectDate(elements.entryDate.value);
+        });
+
+        elements.prevMonthButton.addEventListener("click", function () {
+          changeVisibleMonth(-1);
+        });
+
+        elements.nextMonthButton.addEventListener("click", function () {
+          changeVisibleMonth(1);
+        });
+
+        elements.exportJsonButton.addEventListener("click", function () {
+          exportJsonDownload();
+        });
+
+        elements.exportCsvButton.addEventListener("click", function () {
+          exportCsvDownload();
+        });
+
+        elements.importFile.addEventListener("change", function () {
+          importFromFileInput(elements.importFile.files[0]);
+        });
+
+        elements.startTime.addEventListener("input", clearValidationErrors);
+        elements.endTime.addEventListener("input", clearValidationErrors);
+        elements.pauseMinutes.addEventListener("input", clearValidationErrors);
+      }
+
+      function setupOptionalFileSystemAccess() {
+        var hasFileSystemAccess =
+          "showOpenFilePicker" in window &&
+          "showSaveFilePicker" in window;
+
+        if (!hasFileSystemAccess) {
+          return;
+        }
+
+        elements.fileSystemActions.classList.add("is-visible");
+
+        elements.openFileButton.addEventListener("click", async function () {
+          try {
+            var handles = await window.showOpenFilePicker({
+              multiple: false,
+              types: [{
+                description: "JSON backup",
+                accept: { "application/json": [".json"] }
+              }]
+            });
+            state.fileHandle = handles[0];
+            var file = await state.fileHandle.getFile();
+            await importBackupText(await file.text(), getImportMode(), "file");
+          } catch (error) {
+            if (error.name !== "AbortError") {
+              showBackupMessage("Could not open that file.", "error");
+            }
+          }
+        });
+
+        elements.saveFileButton.addEventListener("click", async function () {
+          try {
+            if (!state.fileHandle) {
+              state.fileHandle = await window.showSaveFilePicker({
+                suggestedName: getBackupFileName(),
+                types: [{
+                  description: "JSON backup",
+                  accept: { "application/json": [".json"] }
+                }]
+              });
+            }
+            await writeBackupToFileHandle(state.fileHandle);
+            showBackupMessage("Backup saved to the chosen file.", "success");
+          } catch (error) {
+            if (error.name !== "AbortError") {
+              showBackupMessage("Could not save to that file.", "error");
+            }
+          }
+        });
+      }
+
+      function loadEntries() {
+        try {
+          var stored = window.localStorage.getItem(STORAGE_KEY);
+          if (!stored) {
+            return {};
+          }
+
+          var parsed = JSON.parse(stored);
+          var validation = validateBackupData(parsed);
+          if (!validation.valid) {
+            return {};
+          }
+
+          return validation.entries;
+        } catch (error) {
+          return {};
+        }
+      }
+
+      function safelySetStorageItem(key, value) {
+        try {
+          window.localStorage.setItem(key, value);
+          return true;
+        } catch (error) {
+          return false;
+        }
+      }
+
+      function safelyRemoveStorageItem(key) {
+        try {
+          window.localStorage.removeItem(key);
+        } catch (error) {
+          return;
+        }
+      }
+
+      function saveEntries() {
+        var backup = {
+          version: BACKUP_VERSION,
+          entries: sortEntriesByDate(state.entries)
+        };
+
+        if (safelySetStorageItem(STORAGE_KEY, JSON.stringify(backup))) {
+          showSavedStatus();
+        } else {
+          showBackupMessage("Could not save locally in this browser. Export your data before closing the page.", "error");
+        }
+      }
+
+      function createEmptyTimer() {
+        return {
+          status: "idle",
+          date: "",
+          startTime: "",
+          startedAtMs: 0,
+          pauseStartedAtMs: null,
+          accumulatedPauseMs: 0,
+          replaceExisting: false
+        };
+      }
+
+      function loadTimer() {
+        try {
+          var stored = window.localStorage.getItem(TIMER_STORAGE_KEY);
+          if (!stored) {
+            return createEmptyTimer();
+          }
+
+          var normalizedTimer = normalizeTimer(JSON.parse(stored));
+          if (!normalizedTimer) {
+            safelyRemoveStorageItem(TIMER_STORAGE_KEY);
+            return createEmptyTimer();
+          }
+
+          return normalizedTimer;
+        } catch (error) {
+          safelyRemoveStorageItem(TIMER_STORAGE_KEY);
+          return createEmptyTimer();
+        }
+      }
+
+      function normalizeTimer(timer) {
+        if (!timer || typeof timer !== "object") {
+          return null;
+        }
+
+        if (timer.status !== "running" && timer.status !== "paused") {
+          return null;
+        }
+
+        var normalized = {
+          status: timer.status,
+          date: String(timer.date || ""),
+          startTime: String(timer.startTime || ""),
+          startedAtMs: Number(timer.startedAtMs),
+          pauseStartedAtMs: timer.pauseStartedAtMs === null ? null : Number(timer.pauseStartedAtMs),
+          accumulatedPauseMs: Math.max(0, Number(timer.accumulatedPauseMs) || 0),
+          replaceExisting: Boolean(timer.replaceExisting)
+        };
+
+        if (!isDateString(normalized.date) || !isTimeString(normalized.startTime) || !Number.isFinite(normalized.startedAtMs)) {
+          return null;
+        }
+
+        if (normalized.status === "paused" && !Number.isFinite(normalized.pauseStartedAtMs)) {
+          return null;
+        }
+
+        if (normalized.status === "running") {
+          normalized.pauseStartedAtMs = null;
+        }
+
+        return normalized;
+      }
+
+      function saveTimer() {
+        if (!isTimerActive()) {
+          safelyRemoveStorageItem(TIMER_STORAGE_KEY);
+          return;
+        }
+
+        if (!safelySetStorageItem(TIMER_STORAGE_KEY, JSON.stringify(state.timer))) {
+          showTimerMessage("Could not save the live timer locally in this browser.", "error");
+        }
+      }
+
+      function clearTimer() {
+        state.timer = createEmptyTimer();
+        saveTimer();
+        ensureTimerClock();
+      }
+
+      function isTimerActive() {
+        return state.timer.status === "running" || state.timer.status === "paused";
+      }
+
+      function setSelectedDate(dateString) {
+        var parts = parseDateString(dateString);
+        state.selectedDate = dateString;
+        state.visibleYear = parts.year;
+        state.visibleMonth = parts.month;
+      }
+
+      function getSortedEntryDates(entries) {
+        return Object.keys(entries).sort();
+      }
+
+      function sortEntriesByDate(entries) {
+        return getSortedEntryDates(entries)
+          .reduce(function (sorted, date) {
+            sorted[date] = entries[date];
+            return sorted;
+          }, {});
+      }
+
+      function saveEntryFromForm() {
+        var rawEntry = getFormEntry();
+        var validation = validateEntry(rawEntry);
+
+        if (!validation.valid) {
+          showValidationErrors(validation.errors);
+          return;
+        }
+
+        state.entries[rawEntry.date] = rawEntry;
+        setSelectedDate(rawEntry.date);
+        saveEntries();
+        renderAll();
+      }
+
+      function deleteSelectedEntry() {
+        if (!state.entries[state.selectedDate]) {
+          return;
+        }
+
+        var readableDate = formatDateForDisplay(state.selectedDate);
+        var confirmed = window.confirm("Delete the entry for " + readableDate + "?");
+        if (!confirmed) {
+          return;
+        }
+
+        delete state.entries[state.selectedDate];
+        saveEntries();
+        loadDateIntoForm(state.selectedDate);
+        renderAll();
+      }
+
+      function startTimer() {
+        if (isTimerActive()) {
+          return;
+        }
+
+        var today = getTodayString();
+        var replaceExisting = Boolean(state.entries[today]);
+        if (replaceExisting) {
+          var confirmed = window.confirm("There is already an entry for today. Start a new live timer anyway?");
+          if (!confirmed) {
+            return;
+          }
+        }
+
+        var now = new Date();
+        state.timer = {
+          status: "running",
+          date: today,
+          startTime: formatTime(now),
+          startedAtMs: now.getTime(),
+          pauseStartedAtMs: null,
+          accumulatedPauseMs: 0,
+          replaceExisting: replaceExisting
+        };
+
+        saveTimer();
+        selectDate(today);
+        setEntryForm({
+          date: today,
+          startTime: state.timer.startTime,
+          endTime: "",
+          pauseMinutes: 0
+        });
+        showTimerMessage("Live tracking started.", "success");
+        ensureTimerClock();
+        renderAll();
+      }
+
+      function toggleTimerPause() {
+        if (!isTimerActive()) {
+          return;
+        }
+
+        var nowMs = Date.now();
+        if (state.timer.status === "running") {
+          state.timer.status = "paused";
+          state.timer.pauseStartedAtMs = nowMs;
+          saveTimer();
+          showTimerMessage("Work is paused.", "warning");
+        } else {
+          state.timer.accumulatedPauseMs = getTimerPauseMs(state.timer, nowMs);
+          state.timer.pauseStartedAtMs = null;
+          state.timer.status = "running";
+          saveTimer();
+          showTimerMessage("Work resumed.", "success");
+        }
+
+        ensureTimerClock();
+        renderTimer();
+      }
+
+      function stopTimer() {
+        if (!isTimerActive()) {
+          return;
+        }
+
+        var now = new Date();
+        var endTime = formatTime(now);
+        var pauseMs = getTimerPauseMs(state.timer, now.getTime());
+        var entry = {
+          date: state.timer.date,
+          startTime: state.timer.startTime,
+          endTime: endTime,
+          pauseMinutes: getTimerPauseMinutesForEntry(pauseMs, state.timer.startTime, endTime)
+        };
+        var validation = validateEntry(entry);
+
+        setEntryForm(entry);
+        setSelectedDate(entry.date);
+
+        if (!validation.valid) {
+          showValidationErrors(validation.errors);
+          showTimerMessage("The timer is still running. Wait until the end time is after the start time, or adjust the form manually.", "warning");
+          renderAll();
+          return;
+        }
+
+        if (state.entries[entry.date] && !state.timer.replaceExisting && !entriesAreEqual(state.entries[entry.date], entry)) {
+          var confirmed = window.confirm("Replace the existing entry for " + formatDateForDisplay(entry.date) + " with this timer result?");
+          if (!confirmed) {
+            return;
+          }
+        }
+
+        state.entries[entry.date] = entry;
+        saveEntries();
+        clearTimer();
+        loadDateIntoForm(entry.date);
+        renderAll();
+        showTimerMessage("Workday saved from the live timer.", "success");
+      }
+
+      function discardTimer() {
+        if (!isTimerActive()) {
+          return;
+        }
+
+        var confirmed = window.confirm("Discard the current live timer without saving it?");
+        if (!confirmed) {
+          return;
+        }
+
+        clearTimer();
+        renderAll();
+        showTimerMessage("Live timer discarded.", "warning");
+      }
+
+      function getFormEntry() {
+        return {
+          date: elements.entryDate.value,
+          startTime: elements.startTime.value,
+          endTime: elements.endTime.value,
+          pauseMinutes: parsePauseMinutes(elements.pauseMinutes.value)
+        };
+      }
+
+      function setEntryForm(entry) {
+        elements.entryDate.value = entry.date;
+        elements.startTime.value = entry.startTime;
+        elements.endTime.value = entry.endTime;
+        elements.pauseMinutes.value = String(entry.pauseMinutes);
+        clearValidationErrors();
+      }
+
+      function entriesAreEqual(left, right) {
+        return Boolean(left && right) &&
+          left.date === right.date &&
+          left.startTime === right.startTime &&
+          left.endTime === right.endTime &&
+          Number(left.pauseMinutes) === Number(right.pauseMinutes);
+      }
+
+      function loadDateIntoForm(dateString) {
+        var entry = state.entries[dateString];
+        state.selectedDate = dateString;
+
+        elements.entryDate.value = dateString;
+
+        if (entry) {
+          elements.startTime.value = entry.startTime;
+          elements.endTime.value = entry.endTime;
+          elements.pauseMinutes.value = String(entry.pauseMinutes);
+        } else {
+          elements.startTime.value = "";
+          elements.endTime.value = "";
+          elements.pauseMinutes.value = "0";
+        }
+
+        clearValidationErrors();
+      }
+
+      function selectDate(dateString) {
+        if (!isDateString(dateString)) {
+          return;
+        }
+
+        setSelectedDate(dateString);
+        loadDateIntoForm(dateString);
+        renderAll();
+      }
+
+      function validateEntry(entry) {
+        var errors = [];
+
+        if (!isDateString(entry.date)) {
+          errors.push("Choose a valid date.");
+        }
+
+        if (!isTimeString(entry.startTime)) {
+          errors.push("Enter a valid start time.");
+        }
+
+        if (!isTimeString(entry.endTime)) {
+          errors.push("Enter a valid end time.");
+        }
+
+        if (!Number.isInteger(entry.pauseMinutes) || entry.pauseMinutes < 0) {
+          errors.push("Pause duration must be zero or a positive whole number.");
+        }
+
+        if (isTimeString(entry.startTime) && isTimeString(entry.endTime)) {
+          var rangeMinutes = timeToMinutes(entry.endTime) - timeToMinutes(entry.startTime);
+          if (rangeMinutes <= 0) {
+            errors.push("End time must be after start time.");
+          }
+
+          if (rangeMinutes > 0 && Number.isInteger(entry.pauseMinutes) && entry.pauseMinutes > rangeMinutes) {
+            errors.push("Pause duration cannot be longer than the time between start and end.");
+          }
+        }
+
+        return {
+          valid: errors.length === 0,
+          errors: errors
+        };
+      }
+
+      function validateBackupData(data) {
+        var normalizedEntries = {};
+        var errors = [];
+
+        if (!data || typeof data !== "object" || Array.isArray(data)) {
+          return {
+            valid: false,
+            errors: ["Backup must be a JSON object."],
+            entries: {}
+          };
+        }
+
+        if (!data.entries || typeof data.entries !== "object" || Array.isArray(data.entries)) {
+          return {
+            valid: false,
+            errors: ["Backup must contain an entries object."],
+            entries: {}
+          };
+        }
+
+        Object.keys(data.entries).forEach(function (date) {
+          var entry = data.entries[date];
+          if (!entry || typeof entry !== "object" || Array.isArray(entry)) {
+            errors.push(date + " is not a valid entry.");
+            return;
+          }
+
+          var normalizedEntry = {
+            date: String(entry.date || date),
+            startTime: String(entry.startTime || ""),
+            endTime: String(entry.endTime || ""),
+            pauseMinutes: parsePauseMinutes(entry.pauseMinutes)
+          };
+
+          if (normalizedEntry.date !== date) {
+            errors.push(date + " has a mismatched entry date.");
+            return;
+          }
+
+          var validation = validateEntry(normalizedEntry);
+          if (!validation.valid) {
+            errors.push(date + ": " + validation.errors.join(" "));
+            return;
+          }
+
+          normalizedEntries[date] = normalizedEntry;
+        });
+
+        return {
+          valid: errors.length === 0,
+          errors: errors,
+          entries: normalizedEntries
+        };
+      }
+
+      function showValidationErrors(errors) {
+        elements.formErrors.innerHTML =
+          "<ul>" +
+          errors.map(function (error) {
+            return "<li>" + escapeHtml(error) + "</li>";
+          }).join("") +
+          "</ul>";
+
+        elements.formErrors.classList.remove("d-none");
+        markInvalidFields(true);
+      }
+
+      function clearValidationErrors() {
+        elements.formErrors.textContent = "";
+        elements.formErrors.classList.add("d-none");
+        markInvalidFields(false);
+      }
+
+      function markInvalidFields(isInvalid) {
+        [elements.entryDate, elements.startTime, elements.endTime, elements.pauseMinutes]
+          .forEach(function (field) {
+            field.setAttribute("aria-invalid", String(isInvalid));
+            field.classList.toggle("is-invalid", isInvalid);
+          });
+      }
+
+      function calculateWorkedMinutes(entry) {
+        if (!entry) {
+          return 0;
+        }
+
+        var validation = validateEntry(entry);
+        if (!validation.valid) {
+          return 0;
+        }
+
+        return timeToMinutes(entry.endTime) - timeToMinutes(entry.startTime) - entry.pauseMinutes;
+      }
+
+      function calculateTotalForDates(dateStrings) {
+        return dateStrings.reduce(function (total, date) {
+          return total + calculateWorkedMinutes(state.entries[date]);
+        }, 0);
+      }
+
+      function calculateWeekTotal(dateString) {
+        var weekBounds = getIsoWeekBounds(dateString);
+        return calculateTotalForDates(getDateRange(weekBounds.start, weekBounds.end));
+      }
+
+      function calculateMonthTotal(year, month) {
+        var firstDay = makeLocalDate(year, month, 1);
+        var lastDay = makeLocalDate(year, month + 1, 0);
+        return calculateTotalForDates(getDateRange(formatDate(firstDay), formatDate(lastDay)));
+      }
+
+      function renderAll() {
+        renderEditorMeta();
+        renderTimer();
+        renderSummaries();
+        renderCalendar();
+      }
+
+      function renderTimer() {
+        var active = isTimerActive();
+        var nowMs = Date.now();
+        var elapsedMs = active ? getTimerElapsedMs(state.timer, nowMs) : 0;
+        var pauseMs = active ? getTimerPauseMs(state.timer, nowMs) : 0;
+        var workedMs = active ? getTimerWorkedMs(state.timer, nowMs) : 0;
+
+        elements.timerWorkedDisplay.textContent = formatClockDuration(workedMs);
+        elements.timerElapsedDisplay.textContent = formatClockDuration(elapsedMs);
+        elements.timerPauseDisplay.textContent = formatClockDuration(pauseMs);
+        elements.timerDateDisplay.textContent = active ? formatDateForDisplay(state.timer.date) : "Today";
+        elements.timerStartDisplay.textContent = active ? state.timer.startTime : "--:--";
+
+        elements.startTimerButton.disabled = active;
+        elements.pauseTimerButton.disabled = !active;
+        elements.stopTimerButton.disabled = !active;
+        elements.discardTimerButton.disabled = !active;
+
+        if (state.timer.status === "paused") {
+          elements.timerStatusBadge.textContent = "Paused";
+          elements.timerStatusBadge.className = "badge rounded-pill text-bg-warning";
+          elements.pauseTimerButton.textContent = "Resume";
+          elements.pauseTimerButton.className = "btn btn-warning fw-semibold";
+        } else if (state.timer.status === "running") {
+          elements.timerStatusBadge.textContent = "Running";
+          elements.timerStatusBadge.className = "badge rounded-pill text-bg-success";
+          elements.pauseTimerButton.textContent = "Pause";
+          elements.pauseTimerButton.className = "btn btn-outline-warning fw-semibold";
+        } else {
+          elements.timerStatusBadge.textContent = "Ready";
+          elements.timerStatusBadge.className = "badge rounded-pill text-bg-secondary";
+          elements.pauseTimerButton.textContent = "Pause";
+          elements.pauseTimerButton.className = "btn btn-outline-warning fw-semibold";
+        }
+      }
+
+      function ensureTimerClock() {
+        if (isTimerActive() && !state.timerIntervalId) {
+          state.timerIntervalId = window.setInterval(renderTimer, MS_PER_SECOND);
+        }
+
+        if (!isTimerActive() && state.timerIntervalId) {
+          window.clearInterval(state.timerIntervalId);
+          state.timerIntervalId = null;
+        }
+      }
+
+      function getTimerElapsedMs(timer, nowMs) {
+        return Math.max(0, nowMs - timer.startedAtMs);
+      }
+
+      function getTimerPauseMs(timer, nowMs) {
+        var pauseMs = Math.max(0, timer.accumulatedPauseMs || 0);
+
+        if (timer.status === "paused" && Number.isFinite(timer.pauseStartedAtMs)) {
+          pauseMs += Math.max(0, nowMs - timer.pauseStartedAtMs);
+        }
+
+        return pauseMs;
+      }
+
+      function getTimerWorkedMs(timer, nowMs) {
+        return Math.max(0, getTimerElapsedMs(timer, nowMs) - getTimerPauseMs(timer, nowMs));
+      }
+
+      function getTimerPauseMinutesForEntry(pauseMs, startTime, endTime) {
+        var rangeMinutes = timeToMinutes(endTime) - timeToMinutes(startTime);
+        var roundedPauseMinutes = Math.max(0, Math.round(pauseMs / MS_PER_MINUTE));
+
+        if (rangeMinutes <= 0) {
+          return roundedPauseMinutes;
+        }
+
+        return Math.min(roundedPauseMinutes, rangeMinutes);
+      }
+
+      function renderEditorMeta() {
+        elements.selectedDateLabel.textContent = formatDateForDisplay(state.selectedDate);
+        elements.deleteButton.disabled = !state.entries[state.selectedDate];
+      }
+
+      function renderSummaries() {
+        var selectedEntry = state.entries[state.selectedDate];
+        var selectedDayMinutes = calculateWorkedMinutes(selectedEntry);
+        var weekBounds = getIsoWeekBounds(state.selectedDate);
+        var monthDate = makeLocalDate(state.visibleYear, state.visibleMonth, 1);
+
+        elements.daySummary.textContent = formatDuration(selectedDayMinutes);
+        elements.daySummaryLabel.textContent = formatDateForDisplay(state.selectedDate);
+
+        elements.weekSummary.textContent = formatDuration(calculateWeekTotal(state.selectedDate));
+        elements.weekSummaryLabel.textContent =
+          formatShortDate(weekBounds.start) + " to " + formatShortDate(weekBounds.end);
+
+        elements.monthSummary.textContent = formatDuration(calculateMonthTotal(state.visibleYear, state.visibleMonth));
+        elements.monthSummaryLabel.textContent = MONTH_FORMATTER.format(monthDate);
+      }
+
+      function renderCalendar() {
+        var monthDate = makeLocalDate(state.visibleYear, state.visibleMonth, 1);
+        elements.calendarTitle.textContent = MONTH_FORMATTER.format(monthDate);
+        elements.calendarGrid.innerHTML = "";
+
+        DAY_NAMES.forEach(function (dayName) {
+          var header = document.createElement("div");
+          header.className = "weekday";
+          header.textContent = dayName;
+          elements.calendarGrid.appendChild(header);
+        });
+
+        getCalendarDates(state.visibleYear, state.visibleMonth).forEach(function (date) {
+          var dateString = formatDate(date);
+          var entry = state.entries[dateString];
+          var button = document.createElement("button");
+          var dayNumber = document.createElement("span");
+
+          button.type = "button";
+          button.className = getDayCellClassNames(date, dateString, Boolean(entry));
+          button.setAttribute("aria-label", getDayAriaLabel(dateString, entry));
+          button.addEventListener("click", function () {
+            selectDate(dateString);
+          });
+
+          dayNumber.className = "day-number";
+          dayNumber.textContent = String(date.getDate());
+          button.appendChild(dayNumber);
+
+          if (entry) {
+            var duration = document.createElement("span");
+            duration.className = "day-duration";
+            duration.textContent = formatDuration(calculateWorkedMinutes(entry));
+            button.appendChild(duration);
+          }
+
+          elements.calendarGrid.appendChild(button);
+        });
+      }
+
+      function getDayCellClassNames(date, dateString, hasEntry) {
+        var classNames = ["day-cell"];
+
+        if (date.getMonth() !== state.visibleMonth) {
+          classNames.push("is-outside");
+        }
+
+        if (hasEntry) {
+          classNames.push("has-entry");
+        }
+
+        if (dateString === state.selectedDate) {
+          classNames.push("is-selected");
+        }
+
+        if (dateString === getTodayString()) {
+          classNames.push("is-today");
+        }
+
+        return classNames.join(" ");
+      }
+
+      function getDayAriaLabel(dateString, entry) {
+        var label = formatDateForDisplay(dateString);
+        if (entry) {
+          label += ", " + formatDuration(calculateWorkedMinutes(entry)) + " worked";
+        } else {
+          label += ", no entry";
+        }
+        return label;
+      }
+
+      function getCalendarDates(year, month) {
+        var firstOfMonth = makeLocalDate(year, month, 1);
+        var mondayOffset = getMondayBasedDay(firstOfMonth) - 1;
+        var start = addDays(firstOfMonth, -mondayOffset);
+        var dates = [];
+
+        // Six full weeks prevent the calendar from changing height between months.
+        for (var index = 0; index < 42; index += 1) {
+          dates.push(addDays(start, index));
+        }
+
+        return dates;
+      }
+
+      function changeVisibleMonth(delta) {
+        var nextMonth = makeLocalDate(state.visibleYear, state.visibleMonth + delta, 1);
+        state.visibleYear = nextMonth.getFullYear();
+        state.visibleMonth = nextMonth.getMonth();
+        renderAll();
+      }
+
+      function exportJsonDownload() {
+        downloadTextFile(buildBackupJson(), getBackupFileName(), "application/json");
+        showBackupMessage("Backup downloaded as JSON.", "success");
+      }
+
+      function exportCsvDownload() {
+        if (getSortedEntryDates(state.entries).length === 0) {
+          showBackupMessage("No saved entries to export as CSV.", "warning");
+          return;
+        }
+
+        downloadTextFile(buildCsvExport(), getCsvFileName(), "text/csv;charset=utf-8");
+        showBackupMessage("Spreadsheet CSV downloaded.", "success");
+      }
+
+      async function importFromFileInput(file) {
+        if (!file) {
+          return;
+        }
+
+        try {
+          await importBackupText(await file.text(), getImportMode(), "file");
+        } catch (error) {
+          showBackupMessage("Could not import that JSON file.", "error");
+        } finally {
+          elements.importFile.value = "";
+        }
+      }
+
+      async function importBackupText(text, mode, sourceLabel) {
+        var parsed;
+        try {
+          parsed = JSON.parse(text);
+        } catch (error) {
+          showBackupMessage("That file is not valid JSON.", "error");
+          return;
+        }
+
+        var validation = validateBackupData(parsed);
+        if (!validation.valid) {
+          showBackupMessage("Import stopped: " + validation.errors[0], "error");
+          return;
+        }
+
+        var incomingEntries = validation.entries;
+        var incomingDates = Object.keys(incomingEntries);
+        if (incomingDates.length === 0) {
+          showBackupMessage("That backup has no entries to import.", "warning");
+          return;
+        }
+
+        var overlapCount = incomingDates.filter(function (date) {
+          return Boolean(state.entries[date]);
+        }).length;
+
+        var confirmed = confirmImport(mode, incomingDates.length, overlapCount);
+        if (!confirmed) {
+          showBackupMessage("Import canceled.", "warning");
+          return;
+        }
+
+        if (mode === "replace") {
+          state.entries = incomingEntries;
+        } else {
+          state.entries = Object.assign({}, state.entries, incomingEntries);
+        }
+
+        saveEntries();
+        setSelectedDate(pickDateAfterImport(incomingEntries));
+        loadDateIntoForm(state.selectedDate);
+        renderAll();
+
+        showBackupMessage("Imported " + incomingDates.length + " entries from " + sourceLabel + ".", "success");
+      }
+
+      function confirmImport(mode, incomingCount, overlapCount) {
+        var message;
+
+        if (mode === "replace") {
+          message = "Replace all current entries with " + incomingCount + " imported entries?";
+        } else {
+          message = "Merge " + incomingCount + " imported entries with current entries?";
+        }
+
+        if (overlapCount > 0) {
+          message += "\n\n" + overlapCount + " existing date" + (overlapCount === 1 ? "" : "s") +
+            " will be overwritten.";
+        }
+
+        return window.confirm(message);
+      }
+
+      function getImportMode() {
+        var checked = document.querySelector("input[name='importMode']:checked");
+        return checked ? checked.value : "merge";
+      }
+
+      function pickDateAfterImport(importedEntries) {
+        if (importedEntries[state.selectedDate]) {
+          return state.selectedDate;
+        }
+
+        var dates = getSortedEntryDates(importedEntries);
+        return dates[dates.length - 1] || getTodayString();
+      }
+
+      function buildBackupJson() {
+        return JSON.stringify({
+          version: BACKUP_VERSION,
+          exportedAt: new Date().toISOString(),
+          entries: sortEntriesByDate(state.entries)
+        }, null, 2);
+      }
+
+      function buildCsvExport() {
+        var header = [
+          "Date",
+          "Start Time",
+          "End Time",
+          "Pause Minutes",
+          "Worked Minutes",
+          "Worked Hours",
+          "Worked Time"
+        ];
+        var rows = getSortedEntryDates(state.entries).map(function (date) {
+          var entry = state.entries[date];
+          var workedMinutes = calculateWorkedMinutes(entry);
+
+          return [
+            entry.date,
+            entry.startTime,
+            entry.endTime,
+            entry.pauseMinutes,
+            workedMinutes,
+            (workedMinutes / 60).toFixed(2),
+            formatDuration(workedMinutes)
+          ];
+        });
+        var csvLines = [header].concat(rows).map(function (row) {
+          return row.map(escapeCsvValue).join(",");
+        });
+
+        // UTF-8 BOM helps Excel recognize the file encoding when opened directly.
+        return "\uFEFF" + csvLines.join("\r\n") + "\r\n";
+      }
+
+      async function writeBackupToFileHandle(fileHandle) {
+        var writable = await fileHandle.createWritable();
+        await writable.write(buildBackupJson());
+        await writable.close();
+      }
+
+      function getBackupFileName() {
+        return "work-time-backup-" + getTodayString() + ".json";
+      }
+
+      function getCsvFileName() {
+        return "work-time-export-" + getTodayString() + ".csv";
+      }
+
+      function downloadTextFile(text, fileName, mimeType) {
+        var blob = new Blob([text], { type: mimeType });
+        var url = URL.createObjectURL(blob);
+        var link = document.createElement("a");
+
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+      }
+
+      function showBackupMessage(text, type) {
+        state.backupMessageTimer = showAlertMessage(
+          elements.backupMessage,
+          state.backupMessageTimer,
+          text,
+          type,
+          "mb-0"
+        );
+      }
+
+      function showTimerMessage(text, type) {
+        state.timerMessageTimer = showAlertMessage(
+          elements.timerMessage,
+          state.timerMessageTimer,
+          text,
+          type,
+          "mb-0 py-2"
+        );
+      }
+
+      function showAlertMessage(element, currentTimer, text, type, extraClasses) {
+        window.clearTimeout(currentTimer);
+        element.textContent = text;
+        element.className = "alert " + getAlertClass(type) + " " + extraClasses;
+
+        return window.setTimeout(function () {
+          element.classList.add("d-none");
+        }, 7000);
+      }
+
+      function getAlertClass(type) {
+        if (type === "success") {
+          return "alert-success";
+        }
+
+        if (type === "warning") {
+          return "alert-warning";
+        }
+
+        if (type === "error") {
+          return "alert-danger";
+        }
+
+        return "alert-info";
+      }
+
+      function showSavedStatus() {
+        elements.saveStatus.textContent = "Saved locally";
+      }
+
+      function formatDuration(totalMinutes) {
+        var minutes = Math.max(0, Math.round(totalMinutes));
+        var hours = Math.floor(minutes / 60);
+        var remainder = minutes % 60;
+
+        if (hours === 0) {
+          return remainder + "m";
+        }
+
+        if (remainder === 0) {
+          return hours + "h";
+        }
+
+        return hours + "h " + remainder + "m";
+      }
+
+      function formatClockDuration(totalMs) {
+        var totalSeconds = Math.max(0, Math.floor(totalMs / MS_PER_SECOND));
+        var hours = Math.floor(totalSeconds / 3600);
+        var minutes = Math.floor((totalSeconds % 3600) / 60);
+        var seconds = totalSeconds % 60;
+
+        return hours + ":" + pad2(minutes) + ":" + pad2(seconds);
+      }
+
+      function timeToMinutes(timeString) {
+        var parts = timeString.split(":").map(Number);
+        return parts[0] * 60 + parts[1];
+      }
+
+      function formatTime(date) {
+        return pad2(date.getHours()) + ":" + pad2(date.getMinutes());
+      }
+
+      function parsePauseMinutes(value) {
+        if (value === "" || value === null || value === undefined) {
+          return NaN;
+        }
+
+        return Number(value);
+      }
+
+      function isTimeString(value) {
+        if (!/^\d{2}:\d{2}$/.test(value)) {
+          return false;
+        }
+
+        var parts = value.split(":").map(Number);
+        return parts[0] >= 0 && parts[0] <= 23 && parts[1] >= 0 && parts[1] <= 59;
+      }
+
+      function isDateString(value) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+          return false;
+        }
+
+        var parts = parseDateString(value);
+        var date = makeLocalDate(parts.year, parts.month, parts.day);
+        return formatDate(date) === value;
+      }
+
+      function parseDateString(dateString) {
+        var parts = dateString.split("-").map(Number);
+        return {
+          year: parts[0],
+          month: parts[1] - 1,
+          day: parts[2]
+        };
+      }
+
+      function formatDate(date) {
+        var year = date.getFullYear();
+        var month = pad2(date.getMonth() + 1);
+        var day = pad2(date.getDate());
+        return year + "-" + month + "-" + day;
+      }
+
+      function formatDateForDisplay(dateString) {
+        if (!isDateString(dateString)) {
+          return dateString;
+        }
+
+        return FULL_DATE_FORMATTER.format(dateFromString(dateString));
+      }
+
+      function formatShortDate(dateString) {
+        var parts = parseDateString(dateString);
+        return pad2(parts.day) + "." + pad2(parts.month + 1) + ".";
+      }
+
+      function getTodayString() {
+        return formatDate(new Date());
+      }
+
+      function dateFromString(dateString) {
+        var parts = parseDateString(dateString);
+        return makeLocalDate(parts.year, parts.month, parts.day);
+      }
+
+      function makeLocalDate(year, month, day) {
+        return new Date(year, month, day, 12, 0, 0, 0);
+      }
+
+      function addDays(date, days) {
+        return makeLocalDate(date.getFullYear(), date.getMonth(), date.getDate() + days);
+      }
+
+      function getDateRange(startDateString, endDateString) {
+        var dates = [];
+        var cursor = dateFromString(startDateString);
+        var end = dateFromString(endDateString);
+
+        while (cursor <= end) {
+          dates.push(formatDate(cursor));
+          cursor = addDays(cursor, 1);
+        }
+
+        return dates;
+      }
+
+      function getIsoWeekBounds(dateString) {
+        var date = dateFromString(dateString);
+        var mondayBasedDay = getMondayBasedDay(date);
+        var monday = addDays(date, 1 - mondayBasedDay);
+        var sunday = addDays(monday, 6);
+
+        return {
+          start: formatDate(monday),
+          end: formatDate(sunday)
+        };
+      }
+
+      function getMondayBasedDay(date) {
+        var day = date.getDay();
+        return day === 0 ? 7 : day;
+      }
+
+      function pad2(value) {
+        return String(value).padStart(2, "0");
+      }
+
+      function escapeHtml(value) {
+        return String(value)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function escapeCsvValue(value) {
+        var text = String(value);
+
+        if (/[",\r\n]/.test(text)) {
+          return "\"" + text.replace(/"/g, "\"\"") + "\"";
+        }
+
+        return text;
+      }
+    }());
+  </script>
+</body>
+</html>
